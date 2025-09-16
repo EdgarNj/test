@@ -1,57 +1,45 @@
 require('dotenv').config();
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 if (!BOT_TOKEN) {
-    console.error('❌ Укажи TELEGRAM_BOT_TOKEN в .env');
+    console.error("❌ Укажи TELEGRAM_BOT_TOKEN в .env");
     process.exit(1);
 }
 
-// Файл для хранения chat_id (можно заменить на БД)
-const CHAT_FILE = 'chats.json';
-let chatIds = [];
-if (fs.existsSync(CHAT_FILE)) {
-    chatIds = JSON.parse(fs.readFileSync(CHAT_FILE, 'utf8'));
-}
+// Храним сообщения в массиве (можно заменить на файл/БД)
+let messages = [];
 
-// Создаём Telegram-бота (long polling)
+// Создаём бота (long polling)
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// При /start сохраняем chat_id
-bot.onText(/\/start/, (msg) => {
-    const chatId = msg.chat.id;
-    if (!chatIds.includes(chatId)) {
-        chatIds.push(chatId);
-        fs.writeFileSync(CHAT_FILE, JSON.stringify(chatIds, null, 2));
-        console.log(`✅ Новый chat_id добавлен: ${chatId}`);
-    }
-    bot.sendMessage(chatId, "Привет 👋 Теперь ты будешь получать уведомления с сайта!");
+// Слушаем ВСЕ входящие сообщения
+bot.on('message', (msg) => {
+    const entry = {
+        chatId: msg.chat.id,
+        from: msg.from.username || `${msg.from.first_name} ${msg.from.last_name || ''}`,
+        text: msg.text,
+        date: new Date(msg.date * 1000).toISOString()
+    };
+    messages.push(entry);
+    console.log("📩 Новое сообщение:", entry);
 });
 
-// Функция отправки уведомлений во все chat_id
-function notifyAll(text) {
-    chatIds.forEach(id => {
-        bot.sendMessage(id, text, { parse_mode: 'HTML' })
-            .catch(err => console.error("Ошибка отправки:", err.response?.body || err.message));
-    });
-}
+// Роут для просмотра всех сообщений
+app.get('/messages', (req, res) => {
+    res.json(messages);
+});
 
-// Роут /test
-app.get('/test', (req, res) => {
-    const now = new Date().toISOString();
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    const ua = req.get('User-Agent') || 'unknown';
-
-    const message = `<b>🔔 Посещение сайта</b>\n<b>Время:</b> ${now}\n<b>IP:</b> <code>${ip}</code>\n<b>User-Agent:</b> ${ua}`;
-
-    notifyAll(message);
-
-    res.send('privet edgar');
+// Главная страница
+app.get('/', (req, res) => {
+    res.send(`
+    <h1>Сообщения из Telegram</h1>
+    <p>Открой <a href="/messages">/messages</a> чтобы посмотреть JSON</p>
+  `);
 });
 
 app.listen(PORT, () => {
