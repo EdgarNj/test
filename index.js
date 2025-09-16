@@ -1,13 +1,15 @@
-// Встроенный http — никаких зависимостей
-const http = require('http');
+const express = require('express');
+const app = express();
 
-const server = http.createServer((req, res) => {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.end('privet edgar');
+// Роут /test
+app.get('/test', (req, res) => {
+    const now = new Date().toISOString();
+    console.log(`[${now}] Кто-то зашёл на /test. IP: ${req.ip}`);
+
+    res.send('privet edgar');
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`API слушает на http://localhost:${PORT}`);
+app.listen(PORT, () => {
+    console.log(`API запущен: http://localhost:${PORT}`);
 });
